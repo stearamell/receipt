@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Receipt Generator</title>
+<style>
+:root{--bg:#f3f4f6;--panel:#fff;--ink:#111;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb}
+@media (prefers-color-scheme:dark){:root{--bg:#111318;--panel:#1b1e25;--ink:#f3f4f6;--muted:#9ca3af;--line:#2d313b;--accent:#60a5fa}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,Segoe UI,Arial,sans-serif}
+.app{display:grid;grid-template-columns:minmax(320px,430px) 1fr;gap:20px;padding:20px;max-width:1100px;margin:auto}
+@media(max-width:820px){.app{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;align-self:start}
+h1{font-size:18px;margin:0 0 12px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:18px 0 8px}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+input,textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--ink);font:inherit;font-size:14px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.item{border:1px dashed var(--line);border-radius:8px;padding:10px;margin-bottom:10px}
+.item .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+button{cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 12px;border-radius:8px;font:inherit;font-size:14px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.danger{color:#dc2626}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.preview{display:flex;justify-content:center;overflow:auto;padding:4px}
+/* RECEIPT */
+#receipt{width:470px;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.35;padding:14px 22px 10px;flex-shrink:0}
+#receipt .c{text-align:center}
+#receipt .title{font-size:25px;margin:0 0 6px}
+#receipt .hd{font-size:15px;line-height:1.5}
+#receipt .orig{font-size:19px;text-align:center;margin:20px 0 2px}
+#receipt .dash{border:0;border-top:1px dashed #000;margin:2px 0 8px}
+#receipt .flex{display:flex;justify-content:space-between;align-items:flex-start}
+#receipt .b{font-weight:bold}
+#receipt .mt{margin-top:12px}
+#receipt .itemrow{display:grid;grid-template-columns:42px 52px 1fr 1fr 1fr;gap:4px}
+#receipt .itemrow .r{text-align:right}
+#receipt .sm{font-size:13.5px}
+#qr{width:76px;height:76px;flex-shrink:0}
+#qr img,#qr canvas{width:76px!important;height:76px!important}
+#receipt .ft{font-size:13.5px;text-align:center;line-height:1.6;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="panel" id="form">
+    <h1>Receipt Generator</h1>
+
+    <h2>Header toko</h2>
+    <label>Nama toko</label><input data-k="brand">
+    <label>Nama perusahaan</label><input data-k="company">
+    <label>Cabang / Geral</label><input data-k="geral">
+    <label>Alamat (baris 1)</label><input data-k="addr1">
+    <label>Alamat (baris 2)</label><input data-k="addr2">
+    <div class="row">
+      <div><label>NPWP</label><input data-k="npwp"></div>
+      <div><label>Tgl. Pengukuhan</label><input data-k="pengukuhan"></div>
+      <div><label>Telepon</label><input data-k="telp"></div>
+      <div><label>Website</label><input data-k="web"></div>
+    </div>
+
+    <h2>Transaksi</h2>
+    <div class="row">
+      <div><label>Store</label><input data-k="store"></div>
+      <div><label>Inv No</label><input data-k="inv"></div>
+      <div><label>Counter</label><input data-k="counter"></div>
+      <div><label>Kasir</label><input data-k="cashier"></div>
+      <div><label>Tanggal &amp; jam</label><input type="datetime-local" step="1" data-k="date"></div>
+      <div><label>Isi QR code</label><input data-k="qr"></div>
+    </div>
+
+    <h2>Item</h2>
+    <div id="items"></div>
+    <button onclick="addItem()">+ Tambah item</button>
+
+    <h2>Pembayaran &amp; footer</h2>
+    <div class="row">
+      <div><label>Metode bayar</label><input data-k="method"></div>
+      <div><label>Bank</label><input data-k="bank"></div>
+      <div><label>Kode APPR</label><input data-k="appr"></div>
+      <div><label>Poin didapat</label><input data-k="points"></div>
+      <div><label>Hemat (Rp)</label><input data-k="saving"></div>
+      <div><label>Tarif PPN (%)</label><input type="number" data-k="ppn"></div>
+    </div>
+    <label>Keterangan bawah</label><input data-k="note">
+
+    <div class="actions">
+      <button class="primary" onclick="download()">⬇ Download PNG</button>
+      <button onclick="window.print()">Print / PDF</button>
+      <button class="danger" onclick="resetAll()">Reset</button>
+    </div>
+  </div>
+
+  <div class="preview"><div id="receipt"></div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const pad=n=>String(n).padStart(2,'0');
+const nowLocal=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`};
+const defaults=()=>({
+  brand:'Nama Toko',company:'PT. Contoh Perusahaan, Tbk',geral:'Geral : KOTA',
+  addr1:'Jl. Contoh Raya No. 1',addr2:'Kelurahan, Kota',
+  npwp:'00.000.000.0-000.000',pengukuhan:'01/01/2000',telp:'Telp. 0000 000000',web:'www.contoh.co.id',
+  store:'KOTA',inv:'XXX0000-000000-0001',counter:'0001',cashier:'Nama Kasir',date:nowLocal(),qr:'XXX0000-000000-0001',
+  method:'Master Card',bank:'BANK',appr:'000000',points:'11',saving:'22 904',ppn:11,
+  note:'Pengambilan gudang (WP)',
+  items:[{code:'ITEM0000000001',desc:'NAMA BARANG 12.5L',lot:'',notice:'WP',qty:4,unit:'PAI',price:1145200,disc:0}]
+});
+let S=JSON.parse(localStorage.getItem('rcpt')||'null')||defaults();
+const save=()=>{try{localStorage.setItem('rcpt',JSON.stringify(S))}catch(e){}};
+const fmt=n=>Number(n||0).toLocaleString('en-US',{maximumFractionDigits:0});
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function fdate(v,sec=0){if(!v)return'';const [d,t]=v.split('T');const [y,m,dd]=d.split('-');let tt=t||'00:00:00';if(tt.length===5)tt+=':00';
+  if(sec){const p=tt.split(':').map(Number);p[2]+=sec;tt=p.map(pad).join(':')}return `${dd}/${m}/${y} ${tt}`}
+
+function buildForm(){
+  document.querySelectorAll('[data-k]').forEach(el=>{el.value=S[el.dataset.k]??'';el.oninput=()=>{S[el.dataset.k]=el.value;render()}});
+  const box=document.getElementById('items');box.innerHTML='';
+  S.items.forEach((it,i)=>{
+    const d=document.createElement('div');d.className='item';
+    d.innerHTML=`<div class="row"><div><label>Kode item</label><input data-f="code" value="${esc(it.code)}"></div>
+      <div><label>Notice</label><input data-f="notice" value="${esc(it.notice)}"></div></div>
+      <label>Deskripsi</label><input data-f="desc" value="${esc(it.desc)}">
+      <div class="row3"><div><label>Qty</label><input type="number" data-f="qty" value="${it.qty}"></div>
+      <div><label>Satuan</label><input data-f="unit" value="${esc(it.unit)}"></div>
+      <div><label>Harga</label><input type="number" data-f="price" value="${it.price}"></div></div>
+      <div class="row"><div><label>Diskon</label><input type="number" data-f="disc" value="${it.disc}"></div>
+      <div><label>Lot Number</label><input data-f="lot" value="${esc(it.lot)}"></div></div>
+      <div style="margin-top:8px"><button class="danger" onclick="delItem(${i})">Hapus item</button></div>`;
+    d.querySelectorAll('[data-f]').forEach(el=>el.oninput=()=>{const f=el.dataset.f;S.items[i][f]=el.type==='number'?parseFloat(el.value)||0:el.value;render()});
+    box.appendChild(d);
+  });
+}
+function addItem(){S.items.push({code:'',desc:'',lot:'',notice:'',qty:1,unit:'PCS',price:0,disc:0});buildForm();render()}
+function delItem(i){S.items.splice(i,1);buildForm();render()}
+function resetAll(){if(confirm('Reset semua data ke contoh?')){S=defaults();buildForm();render()}}
+
+function render(){
+  save();
+  const lines=S.items.length, qty=S.items.reduce((a,b)=>a+(+b.qty||0),0);
+  const amt=it=>Math.max(0,(+it.qty||0)*(+it.price||0)-(+it.disc||0));
+  const total=S.items.reduce((a,b)=>a+amt(b),0);
+  const rate=(+S.ppn||0)/100, dpp=Math.round(total/(1+rate)), ppn=total-dpp;
+  const items=S.items.map(it=>`
+    <div class="mt">
+      <div class="flex"><span>${esc(it.code)}</span><span>${esc(it.lot)}</span><span class="b">${esc(it.notice)}</span></div>
+      <div style="margin:4px 0">${esc(it.desc)}</div>
+      <div class="itemrow"><span>${fmt(it.qty)}</span><span>${esc(it.unit)}</span><span class="r">${fmt(it.price)}</span><span class="r">${it.disc?fmt(it.disc):''}</span><span class="r">${fmt(amt(it))}</span></div>
+    </div>`).join('');
+  const foot=S.items.map(it=>`<div class="flex sm"><span>${esc(it.code)}</span><span class="b">${fmt(it.qty)}</span><span>${esc(it.unit)}</span></div><div class="sm">${esc(it.desc)} <b style="margin-left:60px">${esc(it.notice)}</b></div>`).join('');
+  document.getElementById('receipt').innerHTML=`
+    <div class="c"><div class="title">${esc(S.brand)}</div>
+      <div class="hd">${esc(S.company)}<br>${esc(S.geral)}<br>${esc(S.addr1)}<br>${esc(S.addr2)}<br>NPWP : ${esc(S.npwp)}<br>Tanggal Pengukuhan: ${esc(S.pengukuhan)}<br>${esc(S.telp)}<br>${esc(S.web)}</div></div>
+    <div class="orig">ORIGINAL RECEIPT</div><hr class="dash">
+    <div class="flex"><div style="line-height:1.9">Store : ${esc(S.store)}<br>Inv No : ${esc(S.inv)}
+      <div class="flex" style="gap:60px;margin-top:14px"><span>COUNTER : ${esc(S.counter)}</span><span>${esc(S.cashier)}</span></div>
+      <div>Date : ${fdate(S.date)}</div></div><div id="qr"></div></div>
+    <div class="flex mt" style="margin-top:18px"><span>Item</span><span style="margin-left:auto;margin-right:24px">Lot Number</span><span>Notice</span></div>
+    <div>Description</div>
+    <div class="itemrow b" style="margin-top:8px;font-weight:normal"><span class="b">Qty</span><span></span><span class="r">Price</span><span class="r">Discount</span><span class="r">Amount</span></div>
+    ${items}
+    <div class="flex mt" style="margin-top:22px"><span><b>#Lines :</b> ${lines}</span><span><b>#Qty :</b> ${fmt(qty)}</span><span>${fmt(total)}</span></div>
+    <div class="flex" style="margin-top:14px"><span>DPP :</span><span>${fmt(dpp)}</span></div>
+    <div class="flex"><span>PPN :</span><span>${fmt(ppn)}</span></div>
+    <div class="flex"><span>Total Belanja :</span><span>${fmt(total)}</span></div>
+    <div style="margin-top:16px">Rincian Pembayaran</div>
+    <div class="flex"><span>${esc(S.method)}</span><span class="b" style="margin-right:auto;margin-left:60px">${fmt(total)}</span></div>
+    <div class="flex"><span>${esc(S.bank)}</span><span>APPR ${esc(S.appr)}</span></div>
+    <div class="ft">Poin yang Anda dapat: ${esc(S.points)}<br>Print: ${fdate(S.date,1)}<br>Terima kasih, Anda hemat : ${esc(S.saving)}
+      <div class="b" style="margin-top:12px;font-size:15px">${esc(S.note)}</div></div>
+    <hr class="dash" style="margin-top:2px">${foot}`;
+  const q=document.getElementById('qr');
+  try{new QRCode(q,{text:S.qr||' ',width:152,height:152,correctLevel:QRCode.CorrectLevel.L})}catch(e){}
+}
+async function download(){
+  const el=document.getElementById('receipt');
+  const c=await html2canvas(el,{scale:3,backgroundColor:'#ffffff'});
+  const a=document.createElement('a');a.download=`receipt-${S.inv||'struk'}.png`;a.href=c.toDataURL('image/png');a.click();
+}
+buildForm();render();
+</script>
+<style media="print">
+body{background:#fff}.panel{display:none}.app{display:block;padding:0}.preview{justify-content:flex-start}
+</style>
+</body>
+</html>
